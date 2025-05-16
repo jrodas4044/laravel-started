@@ -1,0 +1,76 @@
+version: "3.8"
+
+services:
+    # Servicio principal de la aplicación Laravel
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: laravel-app
+        restart: unless-stopped
+        working_dir: /var/www/html
+        volumes:
+            - ./:/var/www/html
+        environment:
+            - "DB_CONNECTION=sqlsrv"
+            - "DB_HOST=db"
+            - "DB_PORT=1433"
+            - "DB_DATABASE=laravel"
+            - "DB_USERNAME=sa"
+            - "DB_PASSWORD=S3cureP@ssw0rd"
+            - "REDIS_HOST=redis"
+            - "REDIS_PORT=6379"
+        networks:
+            - laravel-net
+        depends_on:
+            - db
+            - redis
+
+    # Servidor web Nginx
+    nginx:
+        image: nginx:alpine
+        container_name: laravel-nginx
+        restart: unless-stopped
+        ports:
+            - "8000:80"
+        volumes:
+            - ./:/var/www/html
+            - ./docker/nginx/conf.d:/etc/nginx/conf.d
+        networks:
+            - laravel-net
+        depends_on:
+            - app
+
+    # Servicio de base de datos SQL Server
+    db:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        container_name: laravel-sqlserver
+        restart: unless-stopped
+        environment:
+            - "ACCEPT_EULA=Y"
+            - "SA_PASSWORD=S3cureP@ssw0rd"
+            - "MSSQL_PID=Express"
+        ports:
+            - "1433:1433"
+        volumes:
+            - sqlserver_data:/var/opt/mssql
+        networks:
+            - laravel-net
+
+    # Servicio de Redis para caché, sesiones, etc.
+    redis:
+        image: redis:alpine
+        container_name: laravel-redis
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
+        networks:
+            - laravel-net
+
+networks:
+    laravel-net:
+        driver: bridge
+
+volumes:
+    sqlserver_data:
+        driver: local
